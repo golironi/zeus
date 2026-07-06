@@ -23,7 +23,7 @@ export default {
 		trackRequest(env, ctx);
 		await DbService.ensureSchema(env.DB);
 		const url = new URL(request.url);
-		if (Router.isWebSocketUpgrade(request) && url.pathname === "/In_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh") {
+		if (Router.isWebSocketUpgrade(request) && url.pathname === "/newman") {
 			return await Router.handleWebSocket(request, env, ctx);
 		}
 		if (Router.isSubscriptionPath(url.pathname)) {
@@ -54,18 +54,13 @@ const Router = {
 	async handleWebSocket(request, env, ctx) {
 		try {
 			let proxyIP = "proxyip.cmliussss.net";
-			let socks5 = "";
 			try {
 				const proxyRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'proxy_ip'").first();
 				if (proxyRow && proxyRow.value) {
 					proxyIP = proxyRow.value;
 				}
-				const socksRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'socks5'").first();
-				if (socksRow && socksRow.value) {
-					socks5 = socksRow.value;
-				}
 			} catch (e) {}
-			const mockStoredData = { proxy_ip: proxyIP, socks5: socks5 };
+			const mockStoredData = { proxy_ip: proxyIP };
 			return handleVLESS(env, mockStoredData, ctx, request);
 		} catch (e) {
 			return new Response("Internal Server Error", { status: 500 });
@@ -478,59 +473,21 @@ const Router = {
 		}
 		if (url.pathname === "/api/proxy-ip") {
 			if (request.method === "POST") {
-				const { proxy_ip, iata, socks5 } = await request.json();
+				const { proxy_ip, iata } = await request.json();
 				if (proxy_ip) await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('proxy_ip', ?)").bind(proxy_ip).run();
 				if (iata !== undefined) await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('proxy_location_iata', ?)").bind(iata).run();
-				if (socks5 !== undefined) await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('socks5', ?)").bind(socks5).run();
 				return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 			}
 			if (request.method === "GET") {
 				const rowIp = await env.DB.prepare("SELECT value FROM settings WHERE key = 'proxy_ip'").first();
 				const rowIata = await env.DB.prepare("SELECT value FROM settings WHERE key = 'proxy_location_iata'").first();
-				const rowSocks = await env.DB.prepare("SELECT value FROM settings WHERE key = 'socks5'").first();
 				return new Response(
 					JSON.stringify({
 						proxy_ip: rowIp ? rowIp.value : "proxyip.cmliussss.net",
 						iata: rowIata ? rowIata.value : "",
-						socks5: rowSocks ? rowSocks.value : ""
 					}),
 					{ headers: { "Content-Type": "application/json" } },
 				);
-			}
-		}
-		if (url.pathname === "/api/test-proxy" && request.method === "POST") {
-			const { proxy } = await request.json();
-			if (!proxy) return new Response(JSON.stringify({ error: "پروکسی وارد نشده است" }), { status: 400, headers: { "Content-Type": "application/json" } });
-			try {
-				let ip = "";
-				let workingProxy = proxy;
-				if (proxy.includes("t.me/socks") || proxy.includes("tg://socks")) {
-					ip = proxy.match(/server=([^&]+)/)?.[1] || "";
-				} else {
-					let cleanProxy = proxy.replace(/^(socks4|socks5|socks|http|https):\/\//i, '');
-					let proxyParts = cleanProxy.split('@');
-					ip = (proxyParts.length > 1 ? proxyParts[1] : proxyParts[0]).split(':')[0];
-				}
-				let country = "UN";
-				if (ip) {
-					try {
-						const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=countryCode`);
-						const geoData = await geoRes.json();
-						if (geoData && geoData.countryCode) country = geoData.countryCode;
-					} catch (e) {}
-				}
-				const startTime = Date.now();
-				const s = await connectProxy(proxy, "1.1.1.1", 443, null);
-				s.close();
-				const ping = Date.now() - startTime;
-				return new Response(JSON.stringify({ success: true, ping, country }), { headers: { "Content-Type": "application/json" } });
-			} catch (e) {
-				let msg = e.message;
-				if (msg.includes("Stream was cancelled") || msg.includes("network")) msg = "ارتباط با سرور قطع شد (احتمالاً پروکسی مسدود یا خاموش است)";
-				else if (msg.includes("timeout") || msg.includes("timed out")) msg = "تایم‌اوت در اتصال (پروکسی در دسترس نیست)";
-				else if (msg.includes("Invalid URL") || msg.includes("Invalid format")) msg = "فرمت وارد شده برای پروکسی اشتباه است";
-				else if (msg === "err") msg = "خطای نامشخص (ارتباط برقرار نشد)";
-				return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
 			}
 		}
 		if (url.pathname.startsWith("/api/users")) {
@@ -806,8 +763,6 @@ const SubscriptionService = {
 		const links = [];
 		const m1 = decodeURIComponent("%E2%9A%A0%EF%B8%8F%D9%BE%D9%86%D9%84%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%D9%88%20%D8%BA%DB%8C%D8%B1%20%D9%82%D8%A7%D8%A8%D9%84%20%D9%81%D8%B1%D9%88%D8%B4%E2%9A%A0%EF%B8%8F");
 		const m2 = decodeURIComponent("%F0%9F%9A%80%40ZEUS_PANEL_BOT%20%D8%B3%D8%A7%D8%AE%D8%AA%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%F0%9F%9A%80");
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#" + encodeURIComponent(m1));
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#" + encodeURIComponent(m2));
 		let remVol = "Unlimited";
 		if (user.limit_gb) {
 			let rem = user.limit_gb - (user.used_gb || 0);
@@ -826,14 +781,14 @@ const SubscriptionService = {
 			remReq = rem > 0 ? rem.toLocaleString() + "Req" : "0Req";
 		}
 		const infoRemark = "📊 remaining | \u200E" + remVol + " | \u200E" + remTime + " | \u200E" + remReq;
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + host + ":80?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=none&encryption=none&host=" + host + "&fp=" + fp + "&type=ws#" + encodeURIComponent(infoRemark));
+		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + ":80?path=%2Fnewman&security=none&encryption=none&host=" + host + "&fp=" + fp + "&type=ws#" + encodeURIComponent(infoRemark));
 		ips.forEach((ip) => {
 			ports.forEach((portStr) => {
 				const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
 				const tlsVal = isTlsPort ? "tls" : "none";
 				const userFrag = user.frag_len && user.frag_int ? "&fragment=" + user.frag_len + "," + user.frag_int : "";
-				const remark = user.username + " | \u200E" + ip + " | \u200E" + portStr;
-				links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + ip + ":" + portStr + "?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=" + tlsVal + "&encryption=none&insecure=0&host=" + host + "&fp=" + fp + "&type=ws&allowInsecure=0&sni=" + host + userFrag + "#" + encodeURIComponent(remark));
+				const remark = user.username;
+				links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + ip + ":" + portStr + "?path=%2Fnewman&security=" + tlsVal + "&encryption=none&insecure=0&host=" + host + "&fp=" + fp + "&type=ws&allowInsecure=0&sni=" + host + userFrag + "#" + encodeURIComponent(remark));
 			});
 		});
 		const noise = ["# System Update Feed: OK", "# Sync Code: " + Math.random().toString(36).slice(2, 10), "# Version: 2.10.1", "# Description: Secure Node Configurations", ""].join("\n");
@@ -1307,36 +1262,13 @@ async function handleVLESS(env, storedData = null, ctx = null, request = null) {
 					}
 					const task = (async () => {
 						let s = null;
-						const socks5 = storedData?.socks5 || "";
-						
-						if (socks5) {
-							s = await connectProxy(socks5, addr, port, dataPayload);
-						} else {
-							let fHost = proxyIP;
-							let fPort = port;
-							if (proxyIP && proxyIP.includes(":")) {
-								const parts = proxyIP.split(":");
-								fHost = parts[0];
-								fPort = parseInt(parts[1]) || port;
-							}
-							const isCustomProxy = proxyIP && proxyIP !== "proxyip.cmliussss.net";
-
-							if (isCustomProxy) {
-								try {
-									s = await connectDirect(fHost, fPort, dataPayload, targetDoh);
-								} catch (err) {
-									s = await connectDirect(addr, port, dataPayload, targetDoh);
-								}
+						try {
+							s = await connectDirect(addr, port, dataPayload, targetDoh);
+						} catch (err) {
+							if (useFallback && proxyIP) {
+								s = await connectDirect(proxyIP, port, dataPayload, targetDoh);
 							} else {
-								try {
-									s = await connectDirect(addr, port, dataPayload, targetDoh);
-								} catch (err) {
-									if (useFallback && proxyIP) {
-										s = await connectDirect(fHost, fPort, dataPayload, targetDoh);
-									} else {
-										throw err;
-									}
-								}
+								throw err;
 							}
 						}
 						remoteConnWrapper.socket = s;
@@ -2060,169 +1992,6 @@ function trackRequest(env, ctx) {
 		else task();
 	}
 }
-async function connectProxy(proxyStr, destAddr, destPort, initialData) {
-	let normalized = proxyStr;
-	if (proxyStr.includes("t.me/socks") || proxyStr.includes("tg://socks")) {
-		const server = proxyStr.match(/server=([^&]+)/)?.[1];
-		const port = proxyStr.match(/port=([^&]+)/)?.[1];
-		const user = proxyStr.match(/user=([^&]+)/)?.[1];
-		const pass = proxyStr.match(/pass=([^&]+)/)?.[1];
-		if (server && port) {
-			normalized = user && pass ? `socks5://${user}:${pass}@${server}:${port}` : `socks5://${server}:${port}`;
-		}
-	}
-
-	const isHttp = normalized.toLowerCase().startsWith('http://') || normalized.toLowerCase().startsWith('https://');
-	let cleanStr = normalized.replace(/^(socks4|socks5|socks|http|https):\/\//i, '');
-	
-	if (isHttp) {
-		return await connectHttp(cleanStr, destAddr, destPort, initialData);
-	}
-	return await connectSocks5(cleanStr, destAddr, destPort, initialData);
-}
-
-async function connectSocks5(socksStr, destAddr, destPort, initialData) {
-	let user = "", pass = "", host = "", port = 1080;
-	let auth = false;
-	if (socksStr.includes("@")) {
-		const parts = socksStr.split("@");
-		const up = parts[0].split(":");
-		user = up[0] || ""; pass = up[1] || "";
-		auth = true;
-		const hp = parts[1].split(":");
-		host = hp[0]; port = parseInt(hp[1]) || 1080;
-	} else {
-		const hp = socksStr.split(":");
-		host = hp[0]; port = parseInt(hp[1]) || 1080;
-	}
-
-	const socket = connect({ hostname: host, port: port });
-	const reader = socket.readable.getReader();
-	const writer = socket.writable.getWriter();
-
-	try {
-		if (auth) {
-			await writer.write(new Uint8Array([0x05, 0x02, 0x00, 0x02]));
-		} else {
-			await writer.write(new Uint8Array([0x05, 0x01, 0x00]));
-		}
-
-		let res = await reader.read();
-		if (res.done || !res.value || res.value[0] !== 0x05) throw new Error("پاسخ نامعتبر از سرور (پروکسی SOCKS5 نیست یا خاموش است)");
-
-		const method = res.value[1];
-		if (method === 0x02) {
-			const uEnc = new TextEncoder().encode(user);
-			const pEnc = new TextEncoder().encode(pass);
-			const authReq = new Uint8Array(1 + 1 + uEnc.length + 1 + pEnc.length);
-			authReq[0] = 0x01;
-			authReq[1] = uEnc.length;
-			authReq.set(uEnc, 2);
-			authReq[2 + uEnc.length] = pEnc.length;
-			authReq.set(pEnc, 3 + uEnc.length);
-			
-			await writer.write(authReq);
-			let authRes = await reader.read();
-			if (authRes.done || !authRes.value || authRes.value[1] !== 0x00) throw new Error("نام کاربری یا رمز عبور پروکسی اشتباه است");
-		}
-
-		let addrType = 0x03;
-		let addrBytes;
-		if (isIPv4(destAddr)) {
-			addrType = 0x01;
-			addrBytes = new Uint8Array(destAddr.split('.').map(Number));
-		} else {
-			const enc = new TextEncoder().encode(destAddr);
-			addrBytes = new Uint8Array(1 + enc.length);
-			addrBytes[0] = enc.length;
-			addrBytes.set(enc, 1);
-		}
-		
-		const req = new Uint8Array(4 + addrBytes.length + 2);
-		req[0] = 0x05; req[1] = 0x01; req[2] = 0x00; req[3] = addrType;
-		req.set(addrBytes, 4);
-		const portOffset = 4 + addrBytes.length;
-		req[portOffset] = (destPort >> 8) & 0xFF;
-		req[portOffset + 1] = destPort & 0xFF;
-
-		await writer.write(req);
-		let connRes = await reader.read();
-		if (connRes.done || !connRes.value || connRes.value[1] !== 0x00) throw new Error("پروکسی وصل شد اما دسترسی به اینترنت آزاد ندارد");
-
-		if (initialData && initialData.byteLength > 0) {
-			await writer.write(convertToUint8Array(initialData));
-		}
-
-		writer.releaseLock();
-		reader.releaseLock();
-		return socket;
-	} catch (e) {
-		try { writer.releaseLock(); } catch(err){}
-		try { reader.releaseLock(); } catch(err){}
-		try { socket.close(); } catch(err){}
-		throw e;
-	}
-}
-
-async function connectHttp(proxyStr, destAddr, destPort, initialData) {
-	let user = "", pass = "", host = "", port = 80;
-	let auth = false;
-	if (proxyStr.includes("@")) {
-		const parts = proxyStr.split("@");
-		const up = parts[0].split(":");
-		user = up[0] || ""; pass = up[1] || "";
-		auth = true;
-		const hp = parts[1].split(":");
-		host = hp[0]; port = parseInt(hp[1]) || 80;
-	} else {
-		const hp = proxyStr.split(":");
-		host = hp[0]; port = parseInt(hp[1]) || 80;
-	}
-
-	const socket = connect({ hostname: host, port: port });
-	const reader = socket.readable.getReader();
-	const writer = socket.writable.getWriter();
-
-	try {
-		let req = `CONNECT ${destAddr}:${destPort} HTTP/1.1\r\nHost: ${destAddr}:${destPort}\r\n`;
-		if (auth) {
-			const authBase64 = btoa(`${user}:${pass}`);
-			req += `Proxy-Authorization: Basic ${authBase64}\r\n`;
-		}
-		req += "\r\n";
-		
-		await writer.write(new TextEncoder().encode(req));
-		
-		let resStr = "";
-		while (true) {
-			const res = await reader.read();
-			if (res.done || !res.value) throw new Error("proxy_closed");
-			resStr += new TextDecoder().decode(res.value, { stream: true });
-			if (resStr.includes("\r\n\r\n")) {
-				const match = resStr.match(/^HTTP\/\d\.\d\s+(\d+)/);
-				if (match && match[1] === "200") {
-					break;
-				} else {
-					throw new Error("proxy_error_" + (match ? match[1] : "unknown"));
-				}
-			}
-		}
-		
-		if (initialData && initialData.byteLength > 0) {
-			await writer.write(convertToUint8Array(initialData));
-		}
-
-		writer.releaseLock();
-		reader.releaseLock();
-		return socket;
-	} catch (e) {
-		try { writer.releaseLock(); } catch(err){}
-		try { reader.releaseLock(); } catch(err){}
-		try { socket.close(); } catch(err){}
-		throw e;
-	}
-}
-
 const HTML_TEMPLATES = {
 	nginx: `<!DOCTYPE html>
 <html lang="fa" dir="rtl" class="dark">
@@ -2255,7 +2024,7 @@ const HTML_TEMPLATES = {
             <span class="inline-block px-2 py-1 bg-gray-100 dark:bg-amoled-input border border-gray-200 dark:border-zinc-800 rounded-md font-mono text-blue-500 font-bold mx-1 shadow-sm" dir="ltr">/panel</span> 
             را به انتهای آدرس مرورگر خود اضافه کنید.
         </p>
-        <button onclick="window.location.href='/panel'" class="mt-4 w-full py-2.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-medium rounded-xl text-sm transition-colors duration-200 shadow-lg font-bold">
+        <button onclick="window.location.href='/panel'" class="mt-4 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-sm transition-colors duration-200 shadow-lg shadow-blue-600/20 font-bold">
             ورود به پنل
         </button>
     </div>
@@ -2294,7 +2063,7 @@ const HTML_TEMPLATES = {
                 <label class="block text-sm font-medium mb-1.5">تکرار رمز عبور</label>
                 <input type="password" id="confirm-password" class="w-full px-3 py-2 bg-gray-50 dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-center font-mono" required minlength="4">
             </div>
-            <button type="submit" id="submit-btn" class="w-full py-2.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-medium rounded-lg text-sm transition font-bold">ثبت و ورود</button>
+            <button type="submit" id="submit-btn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition font-bold">ثبت و ورود</button>
         </form>
     </div>
     <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
@@ -2392,7 +2161,7 @@ const HTML_TEMPLATES = {
                     <label class="block text-sm font-medium mb-1.5">رمز عبور</label>
                     <input type="password" id="password" class="w-full px-3 py-2 bg-gray-50 dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-center font-mono" required>
                 </div>
-                <button type="submit" id="submit-btn" class="w-full py-2.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-medium rounded-lg text-sm transition font-bold">ورود</button>
+                <button type="submit" id="submit-btn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition font-bold">ورود</button>
             </form>
             <div class="mt-4 text-center">
                 <button onclick="toggleRecovery(true)" class="text-xs text-blue-500 hover:text-blue-600 transition font-medium">بازیابی رمز پنل</button>
@@ -2403,7 +2172,7 @@ const HTML_TEMPLATES = {
             
             <div class="mb-5 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 rounded-xl text-xs leading-relaxed text-orange-800 dark:text-orange-300">
                 برای احراز هویت و اثبات مالکیت پنل، از طریق دکمه زیر وارد کلودفلر شوید و توکن دریافتی را کپی کرده و در کادر زیر وارد کنید.
-                <a href="https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_subdomain%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%5D&accountId=*&zoneId=all&name=Zeus-Deployer-Token" target="_blank" class="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white rounded-lg font-bold transition shadow-md">
+                <a href="https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_subdomain%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%5D&accountId=*&zoneId=all&name=Zeus-Deployer-Token" target="_blank" class="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold transition shadow-md shadow-orange-500/20">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                     دریافت توکن
                 </a>
@@ -2414,8 +2183,8 @@ const HTML_TEMPLATES = {
                     <input type="password" id="api-token" placeholder="توکن را وارد کنید" class="w-full px-3 py-2 bg-gray-50 dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs text-center font-mono" required>
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="toggleRecovery(false)" class="w-1/3 py-2.5 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-lg text-sm transition shadow-sm">انصراف</button>
-                    <button type="submit" id="recover-btn" class="w-2/3 py-2.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-medium rounded-lg text-sm transition font-bold">بازیابی رمز پنل</button>
+                    <button type="button" onclick="toggleRecovery(false)" class="w-1/3 py-2.5 bg-gray-200 dark:bg-zinc-800 hover:bg-gray-300 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 font-medium rounded-lg text-sm transition">انصراف</button>
+                    <button type="submit" id="recover-btn" class="w-2/3 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg text-sm transition font-bold">بازیابی رمز پنل</button>
                 </div>
             </form>
         </div>
@@ -2825,7 +2594,7 @@ const HTML_TEMPLATES = {
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
             به دلیل ارتقای امنیت و تغییر مسیر (Path) اتصال ، کانفیگ‌های قبل از نسخه 1.3.4 غیرفعال شده‌اند. درصورت عدم اتصال لطفاً ساب خود را بروزرسانی کنید .
         </p>
-        <button onclick="closePathWarning()" class="w-full py-3.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-black rounded-xl text-sm transition duration-300 shadow-lg">
+        <button onclick="closePathWarning()" class="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-red-500/25">
             متوجه شدم، کانفیگ‌های جدید را می‌گیرم 
         </button>
     </div>
@@ -2839,7 +2608,7 @@ const HTML_TEMPLATES = {
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
             درخواست‌های روزانه کلودفلر شما از ۹۰,۰۰۰ عبور کرده است. در صورت عبور از محدودیت رایگان ۱۰۰,۰۰۰ درخواست، دسترسی به پنل و اتصالات تا ساعت ۳:۳۰ بامداد (به وقت ایران) قطع خواهد شد.
         </p>
-        <button onclick="closeUsageWarning()" class="w-full py-3.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-black rounded-xl text-sm transition duration-300 shadow-lg">
+        <button onclick="closeUsageWarning()" class="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-orange-500/25">
             متوجه شدم
         </button>
     </div>
@@ -2853,7 +2622,7 @@ const HTML_TEMPLATES = {
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
             این پنل کاملاً <span class="text-rose-500 font-bold">رایگان</span> است. هرگونه فروش پنل یا کانفیگ‌های آن مصداق کلاه‌برداری و رفتاری دور از انسانیت و شرافت است. لطفاً از این ابزار فقط به صورت شخصی و رایگان استفاده کنید.
         </p>
-        <button onclick="closeFreePanelWarning()" class="w-full py-3.5 bg-transparent border-2 border-green-800 text-green-900 hover:bg-green-800 hover:text-white dark:border-green-800 dark:text-green-700 dark:hover:bg-green-900 dark:hover:text-white font-black rounded-xl text-sm transition duration-300 shadow-lg">
+        <button onclick="closeFreePanelWarning()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-rose-500/25">
             تأیید و موافقت
         </button>
     </div>
@@ -2865,7 +2634,7 @@ const HTML_TEMPLATES = {
                     <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
                     <h3 id="modal-title" class="font-bold text-gray-900 dark:text-zinc-100 text-base">ایجاد کاربر جدید</h3>
                 </div>
-                <button onclick="toggleModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+                <button onclick="toggleModal(false)" class="p-1 rounded-lg hover:bg-gray-150 dark:hover:bg-zinc-800/60 text-gray-400 hover:text-gray-650 dark:hover:text-zinc-200 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -3018,8 +2787,8 @@ const HTML_TEMPLATES = {
 						</div>
                 </div>
                 <div class="pt-4 flex gap-3">
-                    <button type="button" onclick="toggleModal(false)" class="flex-1 py-3 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-200 shadow-sm">انصراف</button>
-                    <button type="submit" id="submit-btn" class="flex-1 py-3 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-200 shadow-md hover:shadow-lg">ایجاد کاربر</button>
+                    <button type="button" onclick="toggleModal(false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 text-gray-700 dark:text-zinc-300 font-bold rounded-xl text-sm transition duration-200">انصراف</button>
+                    <button type="submit" id="submit-btn" class="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm transition duration-200 shadow-md shadow-blue-500/10 hover:shadow-lg">ایجاد کاربر</button>
                 </div>
             </form>
         </div>
@@ -3028,7 +2797,7 @@ const HTML_TEMPLATES = {
     <div class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-2xl shadow-xl overflow-hidden transition-all transform duration-300 opacity-0 scale-95 ease-out">
         <div class="px-6 py-4 border-b border-gray-150 dark:border-amoled-border flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
             <h3 class="font-bold text-gray-900 dark:text-zinc-100 text-sm">مخزن آیپی تمیز</h3>
-            <button type="button" onclick="toggleIpSelectorModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+            <button type="button" onclick="toggleIpSelectorModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -3049,35 +2818,8 @@ const HTML_TEMPLATES = {
                 </div>
             </div>
             <div class="pt-4 flex gap-3">
-                <button type="button" onclick="toggleIpSelectorModal(false)" class="flex-1 py-2 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-xl text-xs transition shadow-sm">لغو</button>
-                <button type="button" onclick="applySelectedIps()" class="flex-1 py-2 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-medium rounded-xl text-xs transition">دریافت</button>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="proxy-selector-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 ease-out">
-    <div class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-2xl shadow-xl overflow-hidden transition-all transform duration-300 opacity-0 scale-95 ease-out">
-        <div class="px-6 py-4 border-b border-gray-150 dark:border-amoled-border flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
-            <h3 class="font-bold text-gray-900 dark:text-zinc-100 text-sm">مخزن پروکسی آیپی ثابت</h3>
-            <button type="button" onclick="toggleProxySelectorModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-        <div class="p-6 space-y-4">
-            <div id="proxy-loading-state" class="text-center text-sm text-purple-500 font-bold hidden">
-                در حال پردازش...
-            </div>
-            <div id="proxy-selection-form" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium mb-1.5 text-gray-700 dark:text-zinc-300">کشور را انتخاب کنید</label>
-                    <select id="proxy-country-select" class="w-full px-3 py-2.5 bg-gray-50 dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-700 dark:text-zinc-300 cursor-pointer">
-                        <option value="">در حال دریافت کشورها...</option>
-                    </select>
-                </div>
-            </div>
-            <div class="pt-4 flex gap-3">
-                <button type="button" onclick="toggleProxySelectorModal(false)" class="flex-1 py-2 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-xl text-xs transition shadow-sm">لغو</button>
-                <button type="button" onclick="fetchAndLoadProxy()" id="proxy-fetch-btn" class="flex-1 py-2 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold rounded-xl text-xs transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>دریافت پروکسی</button>
+                <button type="button" onclick="toggleIpSelectorModal(false)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-medium rounded-xl text-xs transition">لغو</button>
+                <button type="button" onclick="applySelectedIps()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl text-xs transition">دریافت</button>
             </div>
         </div>
     </div>
@@ -3086,15 +2828,15 @@ const HTML_TEMPLATES = {
         <div class="w-full max-w-md bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-2xl shadow-xl overflow-hidden transition-all transform duration-300 opacity-0 scale-95 ease-out flex flex-col max-h-[90vh]">
             <div class="px-6 py-4 border-b border-gray-150 dark:border-amoled-border flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
                 <h3 class="font-bold text-gray-900 dark:text-zinc-100">تنظیمات پنل</h3>
-                <button onclick="toggleSettingsModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+                <button onclick="toggleSettingsModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
-                <div id="cf-proxy-section" class="transition-opacity duration-300">
-                    <label class="block text-sm font-medium mb-1.5 text-gray-700 dark:text-zinc-300">ثابت کردن کشور (Cloudflare)</label>
+                <div>
+                    <label class="block text-sm font-medium mb-1.5 text-gray-700 dark:text-zinc-300">موقعیت جغرافیایی پروکسی (Cloudflare)</label>
                     <div class="mb-2">
-                        <input type="text" id="location-search" oninput="filterLocations()" placeholder="جستجوی شهر، کشور یا IATA" class="w-full px-3 py-2 bg-white dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg shadow-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 dark:text-zinc-200 transition">
+                        <input type="text" id="location-search" oninput="filterLocations()" placeholder="جستجوی شهر، کشور یا IATA..." class="w-full px-3 py-2 bg-white dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg shadow-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 dark:text-zinc-200 transition">
                     </div>
                     <div class="relative">
                         <select id="location-select" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg shadow-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 dark:text-zinc-200 cursor-pointer appearance-none">
@@ -3106,26 +2848,11 @@ const HTML_TEMPLATES = {
                     </div>
                 </div>
 				<div class="pt-4 border-t border-gray-100 dark:border-zinc-800">
-                    <div class="flex items-center justify-between gap-2 mb-3">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                            <label class="relative inline-flex items-center cursor-pointer select-none flex-shrink-0">
-                                <input type="checkbox" id="proxy-mode-toggle" onchange="toggleProxyMode(this.checked)" class="sr-only peer">
-                                <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                            </label>
-                            <label class="block text-xs sm:text-sm font-medium text-gray-700 dark:text-zinc-300 cursor-pointer truncate" onclick="document.getElementById('proxy-mode-toggle').click()">ثابت کردن کشور و آیپی</label>
-                        </div>
-                        <a href="https://github.com/IR-NETLIFY/zeus-relay" target="_blank" class="text-[11px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition font-bold shadow-sm flex-shrink-0">ساخت پروکسی شخصی</a>
+                    <label class="block text-sm font-medium mb-1.5 text-gray-700 dark:text-zinc-300">آی‌پی اختصاصی سرور مجازی (Custom VPS Proxy IP)</label>
+                    <div class="relative">
+                        <input type="text" id="custom-proxy-input" placeholder="45.130.125.10:2053" dir="ltr" class="w-full px-3 py-2.5 bg-white dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-zinc-100 transition">
                     </div>
-                    <div class="relative transition-opacity duration-300 opacity-50 pointer-events-none" id="socks5-container">
-                        <input type="text" id="socks5-input" placeholder="socks5:// یا http:// یا (user:pass@ip:port)" dir="ltr" class="w-full px-3 py-2.5 bg-gray-50 dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-zinc-100 transition" disabled>
-                        <div class="mt-2 flex flex-wrap items-center justify-between w-full gap-2">
-                            <div class="flex items-center gap-2">
-                                <button type="button" onclick="testSocksProxy()" id="test-proxy-btn" class="text-[11px] bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition font-bold shadow-sm flex-shrink-0">تست پروکسی</button>
-                                <span id="test-proxy-result" class="text-[11px] font-bold transition-colors break-words leading-relaxed empty:hidden"></span>
-                            </div>
-                            <button type="button" onclick="openProxySelectorModal()" class="text-[11px] bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition font-bold shadow-sm flex-shrink-0">مخزن پروکسی</button>
-                        </div>
-                    </div>
+                    <p class="mt-1 text-[11px] text-gray-500 dark:text-zinc-400">حتماً آی‌پی یا دامنه را <strong class="text-orange-500">همراه با پورت</strong> وارد کنید .</p>
                 </div>
                 <div class="pt-4 border-t border-gray-100 dark:border-zinc-800">
                     <label class="block text-sm font-medium mb-1.5 text-gray-700 dark:text-zinc-300">نرخ رفرش خودکار پنل</label>
@@ -3157,7 +2884,7 @@ const HTML_TEMPLATES = {
                             <label class="block text-[11px] text-gray-500 dark:text-gray-400 font-medium mb-1">رمز عبور جدید</label>
                             <input type="password" id="change-pwd-new" class="w-full px-3 py-2 bg-white dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono text-center">
                         </div>
-                        <button type="button" onclick="changeAdminPassword()" id="change-pwd-btn" class="w-full py-2 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-semibold rounded-lg text-xs transition-all shadow-sm">تغییر رمز عبور</button>
+                        <button type="button" onclick="changeAdminPassword()" id="change-pwd-btn" class="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg text-xs transition-all shadow-sm">تغییر رمز عبور</button>
                     </div>
                 </div>
                 <div class="pt-4 border-t border-gray-100 dark:border-zinc-800">
@@ -3173,8 +2900,8 @@ const HTML_TEMPLATES = {
                     <input type="file" id="backup-file-input" onchange="importUsersBackup(event)" accept=".json" class="hidden">
                 </div>
                 <div class="pt-4 flex gap-3">
-                    <button type="button" onclick="toggleSettingsModal(false)" class="flex-1 py-2 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-lg text-sm transition shadow-sm">انصراف</button>
-                    <button type="button" onclick="saveSettings()" id="save-settings-btn" class="flex-1 py-2 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-medium rounded-lg text-sm transition">ذخیره تنظیمات</button>
+                    <button type="button" onclick="toggleSettingsModal(false)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-medium rounded-lg text-sm transition">انصراف</button>
+                    <button type="button" onclick="saveSettings()" id="save-settings-btn" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition">ذخیره تنظیمات</button>
                 </div>
             </div>
         </div>
@@ -3189,7 +2916,7 @@ const HTML_TEMPLATES = {
             نسخه جدید در دسترس است. اگر آپدیت خودکار جواب نداد، حتماً از طریق لینک زیر آپدیت دستی را انجام دهید.
         </p>
         <div class="space-y-3">
-            <button onclick="applyUpdate()" class="w-full py-3.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-black rounded-xl text-sm transition duration-300 shadow-sm flex items-center justify-center gap-2">
+            <button onclick="applyUpdate()" class="w-full py-3.5 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-500 border border-blue-300 dark:border-blue-500 font-black rounded-xl text-sm transition duration-300 shadow-sm flex items-center justify-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                 آپدیت خودکار (توصیه شده)
             </button>
@@ -3208,7 +2935,7 @@ const HTML_TEMPLATES = {
                 آپدیت دستی (رفتن به سایت)
             </a>
         </div>
-        <button onclick="toggleUpdateModal(false)" class="mt-5 w-full py-3.5 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-300 shadow-sm flex items-center justify-center">
+        <button onclick="toggleUpdateModal(false)" class="mt-5 w-full py-3.5 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-500 border border-red-300 dark:border-red-500 font-bold rounded-xl text-sm transition duration-300 shadow-sm flex items-center justify-center">
             انصراف
         </button>
     </div>
@@ -3220,7 +2947,7 @@ const HTML_TEMPLATES = {
                     <div class="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white">تنظیم توکن کلودفلر</h3>
                 </div>
-                <button onclick="toggleTokenModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+                <button onclick="toggleTokenModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -3237,7 +2964,7 @@ const HTML_TEMPLATES = {
             <div class="space-y-4">
                 <input type="password" id="update-token-input" placeholder="توکن را اینجا وارد کنید" class="w-full px-4 py-3 bg-gray-50 dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-mono text-center text-gray-900 dark:text-zinc-100 transition" dir="auto">
                 
-                <button id="submit-token-btn" onclick="submitTokenForUpdate()" class="w-full py-3 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-300 shadow-lg">
+                <button id="submit-token-btn" onclick="submitTokenForUpdate()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition duration-300 shadow-lg shadow-blue-500/25">
                     ثبت و آپدیت پنل
                 </button>
             </div>
@@ -3247,7 +2974,7 @@ const HTML_TEMPLATES = {
     <div id="qr-modal-card" class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-3xl shadow-2xl p-6 transform transition-all scale-95 opacity-0 duration-200 text-center">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-bold text-gray-900 dark:text-white">QR Code</h3>
-            <button onclick="toggleQrModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+            <button onclick="toggleQrModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -3292,7 +3019,7 @@ const HTML_TEMPLATES = {
                     <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
                     <h3 class="font-bold text-gray-900 dark:text-zinc-100 text-base">ویرایش گروهی کاربران</h3>
                 </div>
-                <button onclick="toggleBulkEditModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+                <button onclick="toggleBulkEditModal(false)" class="p-1 rounded-lg hover:bg-gray-150 dark:hover:bg-zinc-800/60 text-gray-400 hover:text-gray-650 dark:hover:text-zinc-200 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -3419,8 +3146,8 @@ const HTML_TEMPLATES = {
                     </div>
                 </div>
                 <div class="pt-4 flex gap-3">
-                    <button type="button" onclick="toggleBulkEditModal(false)" class="flex-1 py-3 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-200 shadow-sm">انصراف</button>
-                    <button type="submit" id="bulk-submit-btn" class="flex-1 py-3 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-200 shadow-md">ثبت تغییرات گروهی</button>
+                    <button type="button" onclick="toggleBulkEditModal(false)" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 text-gray-700 dark:text-zinc-300 font-bold rounded-xl text-sm transition duration-200">انصراف</button>
+                    <button type="submit" id="bulk-submit-btn" class="flex-1 py-3 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white font-bold rounded-xl text-sm transition duration-200 shadow-md shadow-yellow-500/10">ثبت تغییرات گروهی</button>
                 </div>
             </form>
         </div>
@@ -3434,7 +3161,7 @@ const HTML_TEMPLATES = {
 			<p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
 				آپدیت موفق بود لطفا صفحه را 10 ثانیه دیگر رفرش کنید تا نسخه جدید لود شود
 			</p>
-			<button onclick="window.location.reload()" class="w-full py-3.5 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-black rounded-xl text-sm transition duration-300 shadow-lg">
+			<button onclick="window.location.reload()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-emerald-500/25">
 				رفرش صفحه
 			</button>
 		</div>
@@ -3446,8 +3173,8 @@ const HTML_TEMPLATES = {
         <h3 class="font-black text-xl text-gray-900 dark:text-white mb-3">تأیید عملیات</h3>
         <p id="custom-confirm-message" class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium"></p>
         <div class="flex gap-3">
-            <button id="custom-confirm-cancel" class="flex-1 py-3 bg-transparent border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-200 shadow-sm">انصراف</button>
-            <button id="custom-confirm-ok" class="flex-1 py-3 bg-transparent border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold rounded-xl text-sm transition duration-200 shadow-lg">تأیید</button>
+            <button id="custom-confirm-cancel" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 font-bold rounded-xl text-sm transition duration-200">انصراف</button>
+            <button id="custom-confirm-ok" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition duration-200 shadow-lg">تأیید</button>
         </div>
     </div>
 </div>
@@ -4466,14 +4193,14 @@ function getVlessLink(username) {
             const links = [];
             const m1 = decodeURIComponent('%E2%9A%A0%EF%B8%8F%D8%A7%DB%8C%D9%86%20%D9%BE%D9%86%D9%84%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%D9%88%20%D8%BA%DB%8C%D8%B1%20%D9%82%D8%A7%D8%A8%D9%84%20%D9%81%D8%B1%D9%88%D8%B4%20%D8%A7%D8%B3%D8%AA%E2%9A%A0%EF%B8%8F');
             const m2 = decodeURIComponent('%E2%99%A8%EF%B8%8F%20%40ZEUS_PANEL_BOT%20%D8%B3%D8%A7%D8%AE%D8%AA%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%E2%99%A8%EF%B8%8F');
-            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#' + encodeURIComponent(m1));
-            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#' + encodeURIComponent(m2));
+            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2Fnewman#' + encodeURIComponent(m1));
+            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2Fnewman#' + encodeURIComponent(m2));
             ips.forEach((ip) => {
                 ports.forEach((portStr) => {
                     const isTlsPort = tlsPorts.includes(portStr);
                     const tlsVal = isTlsPort ? 'tls' : 'none';
                     const remark = user.username + ' | \u200E' + ip + ' | \u200E' + portStr;
-                    links.push('vle' + 'ss://' + (user.uuid || '') + '@' + ip + ':' + portStr + '?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
+                    links.push('vle' + 'ss://' + (user.uuid || '') + '@' + ip + ':' + portStr + '?path=%2Fnewman&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
                 });
             });
             return links.join('\\n');
@@ -4640,18 +4367,6 @@ async function loadLocations() {
             }
         } catch(e) {}
     }
-    
-    try {
-        const locRes = await fetch('/locations');
-        if (locRes.ok) {
-            const locData = await locRes.json();
-            if (Array.isArray(locData) && locData.length > 0) {
-                localStorage.setItem('cached_locations_list', JSON.stringify(locData));
-                hasCachedLocs = true;
-            }
-        }
-    } catch(e) {}
-
     try {
         const statusRes = await fetch('/api/proxy-ip');
         let activeIata = '';
@@ -4659,30 +4374,20 @@ async function loadLocations() {
             const statusData = await statusRes.json();
             activeIata = statusData.iata || '';
             localStorage.setItem('cached_active_iata', activeIata);
-            
-            const socksInput = document.getElementById('socks5-input');
-            const proxyToggle = document.getElementById('proxy-mode-toggle');
-            
-            if (statusData.socks5) {
-                if (socksInput) socksInput.value = statusData.socks5;
-                if (proxyToggle) {
-                    proxyToggle.checked = true;
-                    if (typeof window.toggleProxyMode === 'function') window.toggleProxyMode(true);
-                }
-            } else {
-                if (socksInput) socksInput.value = '';
-                if (proxyToggle) {
-                    proxyToggle.checked = false;
-                    if (typeof window.toggleProxyMode === 'function') window.toggleProxyMode(false);
+            const customInput = document.getElementById('custom-proxy-input');
+            if (customInput) {
+                if (!activeIata && statusData.proxy_ip && statusData.proxy_ip !== 'proxyip.cmliussss.net') {
+                    customInput.value = statusData.proxy_ip;
+                } else {
+                    customInput.value = '';
                 }
             }
         }
-        
-        const updatedCachedLocs = localStorage.getItem('cached_locations_list');
-        if (updatedCachedLocs) {
-            const parsed = JSON.parse(updatedCachedLocs);
-            renderLocationsUI(parsed, activeIata);
-        }
+        const res = await fetch('/locations');
+        if (!res.ok) throw new Error();
+        const locations = await res.json();
+        localStorage.setItem('cached_locations_list', JSON.stringify(locations));
+        renderLocationsUI(locations, activeIata);
     } catch (err) {
         if (!hasCachedLocs) {
             select.innerHTML = '<option value="">⚠️ خطا در دریافت لوکیشن‌ها</option>';
@@ -4690,18 +4395,19 @@ async function loadLocations() {
     }
 }
 async function saveSettings() {
-    const proxyModeToggle = document.getElementById('proxy-mode-toggle');
-    const isProxyMode = proxyModeToggle ? proxyModeToggle.checked : false;
     const select = document.getElementById('location-select');
-    const socksInput = document.getElementById('socks5-input');
-    const socks5Proxy = (isProxyMode && socksInput) ? socksInput.value.trim() : '';
-    let iata = (!isProxyMode && select) ? select.value : '';
+    const customInput = document.getElementById('custom-proxy-input');
+    const customProxy = customInput ? customInput.value.trim() : '';
+    let iata = select.value;
     const btn = document.getElementById('save-settings-btn');
     btn.disabled = true;
     btn.innerText = 'در حال ذخیره...';
     try {
         let resolvedIp = 'proxyip.cmliussss.net';
-        if (iata) {
+        if (customProxy) {
+            resolvedIp = customProxy;
+            iata = '';
+        } else if (iata) {
             const domain = iata.toLowerCase() + '.proxyip.cmliussss.net';
             const dnsRes = await fetch('https://cloudflare-dns.com/dns-query?name=' + domain + '&type=A', {
                 headers: { 'accept': 'application/dns-json' }
@@ -4720,10 +4426,10 @@ async function saveSettings() {
         const response = await fetch('/api/proxy-ip', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ proxy_ip: resolvedIp, iata: iata ? iata.toUpperCase() : '', socks5: socks5Proxy })
+            body: JSON.stringify({ proxy_ip: resolvedIp, iata: iata ? iata.toUpperCase() : '' })
         });
         if (response.ok) {
-            alert('✅ تنظیمات با موفقیت ذخیره شد.\\n' + (isProxyMode ? 'آی‌پی با پروکسی ثابت شد.' : (iata ? 'آی‌پی پروکسی کلودفلر: ' + resolvedIp : 'آدرس پروکسی به حالت پیش‌فرض بازگشت.')));
+            alert('✅ تنظیمات با موفقیت ذخیره شد.\\n' + (customProxy ? 'آی‌پی اختصاصی سرور: ' + resolvedIp : (iata ? 'آی‌پی پروکسی کلودفلر: ' + resolvedIp : 'آدرس پروکسی به حالت پیش‌فرض بازگشت.')));
             toggleSettingsModal(false);
         } else {
             alert('خطا در ذخیره تنظیمات');
@@ -4735,77 +4441,6 @@ async function saveSettings() {
         btn.innerText = 'ذخیره تنظیمات';
     }
 }
-async function testSocksProxy() {
-	const btn = document.getElementById('test-proxy-btn');
-	const resultSpan = document.getElementById('test-proxy-result');
-	const proxyStr = document.getElementById('socks5-input').value.trim();
-	if (!proxyStr) {
-		resultSpan.innerText = 'وارد نشده!';
-		resultSpan.className = 'text-[11px] font-bold text-red-500 w-full mt-1';
-		return;
-	}
-	btn.disabled = true;
-	btn.innerText = 'صبر کنید...';
-	resultSpan.innerText = '';
-	resultSpan.className = 'text-[11px] font-bold transition-colors empty:hidden';
-	
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-	try {
-		const res = await fetch('/api/test-proxy', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ proxy: proxyStr }),
-			signal: controller.signal
-		});
-		clearTimeout(timeoutId);
-		const data = await res.json();
-		if (res.ok && data.success) {
-			const flag = typeof getFlagEmoji === 'function' ? getFlagEmoji(data.country) : '🌐';
-			resultSpan.innerText = flag + ' پینگ: ' + data.ping + 'ms';
-			resultSpan.className = 'text-[11px] font-bold text-emerald-500';
-		} else {
-			resultSpan.innerText = 'خطا: ' + (data.error || 'ناموفق');
-			resultSpan.className = 'text-[11px] font-bold text-red-500 w-full mt-1 break-words';
-		}
-	} catch (e) {
-		clearTimeout(timeoutId);
-		if (e.name === 'AbortError') {
-			resultSpan.innerText = 'تایم‌اوت (پروکسی خراب است)';
-		} else {
-			resultSpan.innerText = 'خطا در ارتباط';
-		}
-		resultSpan.className = 'text-[11px] font-bold text-red-500 w-full mt-1 break-words';
-	} finally {
-		btn.disabled = false;
-		btn.innerText = 'تست پروکسی';
-	}
-}
-
-window.toggleProxyMode = function(isSocksMode) {
-    const cfSection = document.getElementById('cf-proxy-section');
-    const socksContainer = document.getElementById('socks5-container');
-    const locationSelect = document.getElementById('location-select');
-    const locationSearch = document.getElementById('location-search');
-    const socksInput = document.getElementById('socks5-input');
-
-    if (isSocksMode) {
-        if (cfSection) cfSection.classList.add('opacity-50', 'pointer-events-none');
-        if (locationSelect) locationSelect.disabled = true;
-        if (locationSearch) locationSearch.disabled = true;
-
-        if (socksContainer) socksContainer.classList.remove('opacity-50', 'pointer-events-none');
-        if (socksInput) socksInput.disabled = false;
-    } else {
-        if (cfSection) cfSection.classList.remove('opacity-50', 'pointer-events-none');
-        if (locationSelect) locationSelect.disabled = false;
-        if (locationSearch) locationSearch.disabled = false;
-
-        if (socksContainer) socksContainer.classList.add('opacity-50', 'pointer-events-none');
-        if (socksInput) socksInput.disabled = true;
-    }
-};
 window.filterLocations = function() {
     const searchTerm = document.getElementById('location-search').value.toLowerCase().trim();
     const cachedLocations = localStorage.getItem('cached_locations_list');
@@ -5032,7 +4667,7 @@ window.filterLocations = function() {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.7.0';
+const CURRENT_VERSION = '1.6.8';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -5288,200 +4923,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-		
-let cachedProxyCountries = null;
-
-function toggleProxySelectorModal(show) {
-    const modal = document.getElementById('proxy-selector-modal');
-    const card = modal.querySelector('div');
-    if (show) {
-        modal.classList.remove('opacity-0', 'pointer-events-none');
-        modal.classList.add('opacity-100', 'pointer-events-auto');
-        card.classList.remove('opacity-0', 'scale-95');
-        card.classList.add('opacity-100', 'scale-100');
-    } else {
-        modal.classList.remove('opacity-100', 'pointer-events-auto');
-        modal.classList.add('opacity-0', 'pointer-events-none');
-        card.classList.remove('opacity-100', 'scale-100');
-        card.classList.add('opacity-0', 'scale-95');
-    }
-}
-
-async function openProxySelectorModal() {
-    toggleProxySelectorModal(true);
-    const select = document.getElementById('proxy-country-select');
-    const fetchBtn = document.getElementById('proxy-fetch-btn');
-    
-    const countriesList = [
-  "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR",
-  "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE",
-  "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ",
-  "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD",
-  "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR",
-  "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM",
-  "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "FI",
-  "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
-  "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS",
-  "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU",
-  "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT",
-  "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN",
-  "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK",
-  "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME",
-  "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ",
-  "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
-  "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU",
-  "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM",
-  "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS",
-  "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI",
-  "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV",
-  "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK",
-  "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA",
-  "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
-  "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW"
-];
-    
-    select.innerHTML = '';
-    countriesList.forEach(country => {
-        const option = document.createElement('option');
-        option.value = country;
-        const flag = typeof getFlagEmoji === 'function' ? getFlagEmoji(country) : '🌐';
-        option.textContent = flag + ' ' + country;
-        select.appendChild(option);
-    });
-    
-    fetchBtn.disabled = false;
-}
-
-function populateProxyCountries(countries) {
-    const select = document.getElementById('proxy-country-select');
-    const fetchBtn = document.getElementById('proxy-fetch-btn');
-    select.innerHTML = '';
-    countries.forEach(country => {
-        const option = document.createElement('option');
-        option.value = country;
-        const flag = typeof getFlagEmoji === 'function' ? getFlagEmoji(country) : '🌐';
-        option.textContent = flag + ' ' + country;
-        select.appendChild(option);
-    });
-    fetchBtn.disabled = false;
-}
-
-async function fetchAndLoadProxy() {
-    const select = document.getElementById('proxy-country-select');
-    const country = select.value;
-    if (!country) return;
-
-    const loadingState = document.getElementById('proxy-loading-state');
-    const formState = document.getElementById('proxy-selection-form');
-    const fetchBtn = document.getElementById('proxy-fetch-btn');
-
-    loadingState.classList.remove('hidden');
-    loadingState.innerText = 'در حال اسکن سریع پروکسی‌ها...';
-    formState.classList.add('hidden');
-    fetchBtn.disabled = true;
-
-    try {
-        const sources = [
-            { url: 'https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/countries/' + country + '/data.txt', prefix: '' },
-            { url: 'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&country=' + country, prefix: 'socks5://' },
-            { url: 'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks4&country=' + country, prefix: 'socks4://' },
-            { url: 'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&country=' + country, prefix: 'http://' },
-            { url: 'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=https&country=' + country, prefix: 'https://' }
-        ];
-
-        const responses = await Promise.allSettled(sources.map(src => 
-            fetch(src.url).then(async res => {
-                if (!res.ok) throw new Error();
-                const text = await res.text();
-                return { text: text, prefix: src.prefix };
-            })
-        ));
-
-        let combinedProxies = [];
-
-        for (const res of responses) {
-            if (res.status === 'fulfilled' && res.value && res.value.text) {
-                const rawLines = res.value.text.split('\\n');
-                for (let line of rawLines) {
-                    line = line.trim();
-                    if (line.length > 5) {
-                        if (res.value.prefix && !line.includes('://')) {
-                            combinedProxies.push(res.value.prefix + line);
-                        } else {
-                            combinedProxies.push(line);
-                        }
-                    }
-                }
-            }
-        }
-
-        let lines = [...new Set(combinedProxies.filter(l => l.match(/^(socks4|socks5|socks|http|https):\\/\\//i)))];
-
-        if (lines.length > 0) {
-            for (let i = lines.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [lines[i], lines[j]] = [lines[j], lines[i]];
-            }
-
-            let foundWorkingProxy = null;
-            const BATCH_SIZE = 10;
-
-            for (let i = 0; i < lines.length; i += BATCH_SIZE) {
-                const batch = lines.slice(i, i + BATCH_SIZE);
-                loadingState.innerText = 'تست گروه ' + (Math.floor(i / BATCH_SIZE) + 1) + ' (بررسی ' + batch.length + ' آی‌پی)...';
-
-                try {
-                    foundWorkingProxy = await Promise.any(batch.map(async (candidate) => {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-                        try {
-                            const testRes = await fetch('/api/test-proxy', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ proxy: candidate }),
-                                signal: controller.signal
-                            });
-                            clearTimeout(timeoutId);
-                            const testData = await testRes.json();
-                            if (testRes.ok && testData.success) {
-                                return candidate;
-                            }
-                            throw new Error();
-                        } catch (err) {
-                            clearTimeout(timeoutId);
-                            throw err;
-                        }
-                    }));
-                    
-                    if (foundWorkingProxy) break;
-                } catch (e) {
-                }
-            }
-
-            if (foundWorkingProxy) {
-                document.getElementById('socks5-input').value = foundWorkingProxy;
-                document.getElementById('test-proxy-result').innerText = '';
-                toggleProxySelectorModal(false);
-                showToast('پروکسی سالم پیدا و لود شد.');
-            } else {
-                alert('پروکسی سالم در این کشور یافت نشد');
-            }
-        } else {
-            alert('پروکسی برای این کشور یافت نشد.');
-        }
-    } catch (e) {
-        alert('خطا در دریافت لیست پروکسی‌ها از سرور.');
-    } finally {
-        loadingState.classList.add('hidden');
-        formState.classList.remove('hidden');
-        fetchBtn.disabled = false;
-    }
-}
-
-window.addEventListener('click', (e) => {
-    if (e.target.id === 'proxy-selector-modal') toggleProxySelectorModal(false);
-});
     </script>
 </body>
 </html>`,
@@ -5523,7 +4964,7 @@ window.addEventListener('click', (e) => {
             <div class="inline-block p-3.5 bg-blue-600/10 text-blue-500 rounded-3xl mb-3 border border-blue-500/20 shadow-lg shadow-blue-500/5">
                 <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
             </div>
-            <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-1">پنل زئوس - وضعیت اشتراک</h1>
+            <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-1">پنل کاربران - وضعیت اشتراک</h1>
             <p id="display-username" class="text-sm font-bold text-blue-500 tracking-wide font-mono mb-2"></p>
             <div id="live-connections-badge" class="hidden inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full text-xs font-bold shadow-sm">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -5625,46 +5066,13 @@ window.addEventListener('click', (e) => {
     <div id="qr-modal-card" class="w-full max-w-sm bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-3xl shadow-2xl p-6 transform transition-all scale-95 opacity-0 duration-200 text-center">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-bold text-gray-900 dark:text-white">QR Code</h3>
-            <button onclick="toggleQrModal(false)" class="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 shadow-sm">
+            <button onclick="toggleQrModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="flex justify-center bg-white p-4 rounded-xl mb-4">
             <div id="qrcode-container"></div>
         </div>
-    </div>
-</div>
-<div class="flex flex-col gap-4 mt-6 z-10">
-    <div class="flex items-center gap-4 justify-center">
-        <a href="https://github.com/IR-NETLIFY/zeus" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-gray-700 dark:text-zinc-300 hover:text-black dark:hover:text-white group">
-            <svg class="w-5 h-5 group-hover:scale-110 transition" viewBox="0 0 24 24" fill="currentColor">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z"/>
-            </svg>
-            گیت‌هاب
-        </a>
-
-        <a href="https://t.me/ZEUS_PANEL_BOT" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-gray-700 dark:text-zinc-300 hover:text-sky-500 dark:hover:text-sky-400 group">
-            <svg class="w-5 h-5 text-sky-500 group-hover:scale-110 transition" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.94-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.37.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .24z"/>
-            </svg>
-            ZEUS_PANEL_BOT@
-        </a>
-    </div>
-	
-    <div class="flex items-center gap-4 justify-center">
-        <a href="https://zeus-panel.ir-netlify.workers.dev/" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-300 group">
-            <svg class="w-5 h-5 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-            ساخت رایگان پنل
-        </a>
-
-        <a href="https://donatonion.ir-netlify.workers.dev" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 group">
-            <svg class="w-5 h-5 text-red-500 dark:text-red-400 group-hover:scale-110 transition" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3 9.24 3 10.91 3.81 12 5.08 13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-            دونیت
-        </a>
     </div>
 </div>
 <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
@@ -5719,7 +5127,7 @@ window.addEventListener('click', (e) => {
                     var isTlsPort = ['443', '2053', '2083', '2087', '2096', '8443'].includes(portStr);
                     var tlsVal = isTlsPort ? 'tls' : 'none';
                     var remark = ips.length > 1 ? (u.username + '-' + (ipIndex + 1) + '-' + portStr) : (u.username + '-' + portStr);
-                    links.push('vle' + 'ss://' + (u.uuid || '') + '@' + ip + ':' + portStr + '?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
+                    links.push('vle' + 'ss://' + (u.uuid || '') + '@' + ip + ':' + portStr + '?path=%2Fnewman&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
                 });
             });
             return links.join('\\n');
@@ -5877,8 +5285,6 @@ window.addEventListener('click', (e) => {
         window.addEventListener('click', (e) => {
             if (e.target.id === 'qr-modal') toggleQrModal(false);
         });
-		
-
     </script>
 </body>
 </html>`,
