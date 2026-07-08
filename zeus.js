@@ -286,7 +286,7 @@ const Router = {
 					currentAccountId = accData.result[0].id;
 				}
 
-				const githubRes = await fetch("https://raw.githubusercontent.com/golironi/zeus/refs/heads/main/zeusme.js?t=" + Date.now() + Math.random(), {
+				const githubRes = await fetch("https://raw.githubusercontent.com/golironi/zeus/refs/heads/main/zeus.js?t=" + Date.now() + Math.random(), {
 					headers: {
 						"Cache-Control": "no-cache, no-store, must-revalidate",
 						Pragma: "no-cache",
