@@ -354,7 +354,7 @@ const Router = {
 			}
 
 			try {
-				const githubRes = await fetch("https://raw.githubusercontent.com/golironi/zeus/refs/heads/main/zeusme.js?t=" + Date.now(), {
+				const githubRes = await fetch("https://raw.githubusercontent.com/golironi/zeus/refs/heads/main/zeus.js?t=" + Date.now(), {
 					headers: {
 						"Cache-Control": "no-cache, no-store, must-revalidate",
 						Pragma: "no-cache",
@@ -2283,7 +2283,7 @@ const HTML_TEMPLATES = {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZEUS Panel</title>
+    <title>Admin Panel</title>
     <script>
         const originalWarn = console.warn;
         console.warn = (...args) => {
@@ -4667,7 +4667,7 @@ window.filterLocations = function() {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.6.9';
+const CURRENT_VERSION = '1.7.0';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
